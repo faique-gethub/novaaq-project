@@ -1,0 +1,58 @@
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { TriangleLogo } from "@/src/components/TriangleLogo";
+import { BigButton } from "@/src/components/ui";
+import { useLang } from "@/src/i18n/context";
+import { authService } from "@/src/services/auth";
+import { colors, font, spacing } from "@/src/theme";
+
+export default function LanguageScreen() {
+  const { setLang } = useLang();
+  const router = useRouter();
+
+  const choose = async (l: "en" | "ur") => {
+    await setLang(l);
+    const user = await authService.currentUser();
+    if (user && user.verified) {
+      router.replace(("/(app)/" + user.role) as any);
+    } else {
+      router.replace("/login" as any);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.root} edges={["top", "bottom"]} testID="language-screen">
+      <View style={styles.logoWrap}>
+        <TriangleLogo size={160} />
+        <Text style={styles.brand} testID="app-name">Novaaq</Text>
+      </View>
+
+      <View style={styles.body}>
+        <Text style={styles.title} testID="choose-language-title">Choose Language</Text>
+        <Text style={styles.subtitle}>زبان منتخب کریں</Text>
+        <BigButton
+          label="English"
+          onPress={() => choose("en")}
+          testID="language-english-button"
+        />
+        <BigButton
+          label="اردو"
+          onPress={() => choose("ur")}
+          variant="secondary"
+          testID="language-urdu-button"
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.white, paddingHorizontal: spacing.lg },
+  logoWrap: { alignItems: "center", marginTop: spacing.xl },
+  brand: { fontSize: font.h1, fontWeight: "800", color: colors.text, marginTop: spacing.md },
+  body: { flex: 1, justifyContent: "center" },
+  title: { fontSize: font.h1, fontWeight: "800", color: colors.text, textAlign: "center", marginBottom: spacing.sm },
+  subtitle: { fontSize: font.h2, fontWeight: "700", color: colors.text_secondary, textAlign: "center", marginBottom: spacing.xl },
+});
