@@ -4,6 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import json
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
@@ -19,11 +20,16 @@ load_dotenv(ROOT_DIR / ".env")
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
-
 # ---------- Firebase Admin init ----------
-firebase_admin.initialize_app(
-    credentials.Certificate(str(ROOT_DIR / "firebase-service-account.json"))
-)
+firebase_json = os.getenv("FIREBASE_SERVICE_ACCOUNT")
+
+if not firebase_json:
+    raise RuntimeError(
+        "FIREBASE_SERVICE_ACCOUNT environment variable is missing"
+    )
+
+cred = credentials.Certificate(json.loads(firebase_json))
+firebase_admin.initialize_app(cred)
 
 # Only these real, verified emails can ever get admin role.
 # Edit this list to your real gmail addresses.
