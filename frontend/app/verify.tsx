@@ -13,7 +13,7 @@ const OTP_LEN = 4;
 export default function VerifyScreen() {
   const { t } = useLang();
   const router = useRouter();
-  const { user_id } = useLocalSearchParams<{ user_id: string }>();
+  const { role } = useLocalSearchParams<{ role: "customer" | "seller" }>();
   const [digits, setDigits] = useState<string[]>(Array(OTP_LEN).fill(""));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -34,23 +34,31 @@ export default function VerifyScreen() {
     if (val && i < OTP_LEN - 1) refs.current[i + 1]?.focus();
   };
 
-  const submit = async () => {
-    setErr("");
-    const code = digits.join("");
-    if (code.length < 4) {
-      setErr(t("err_fill_all"));
-      return;
-    }
-    setBusy(true);
-    try {
-      const user = await authService.verify(String(user_id), code);
-      router.replace(("/(app)/" + user.role) as any);
-    } catch (e: any) {
-      setErr(e?.message || t("err_generic"));
-    } finally {
-      setBusy(false);
-    }
-  };
+ const submit = async () => {
+  setErr("");
+
+  const code = digits.join("");
+
+  if (code.length < 4) {
+    setErr(t("err_fill_all"));
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    const user = await authService.confirmPhoneOtp(
+      code,
+      (role as "customer" | "seller") || "customer"
+    );
+
+    router.replace(("/(app)/" + user.role) as any);
+  } catch (e: any) {
+    setErr(e?.message || t("err_generic"));
+  } finally {
+    setBusy(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]} testID="verify-screen">
