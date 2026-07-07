@@ -53,19 +53,29 @@ export const authService = {
     await sendEmailVerification(current);
   },
 
-  // ---------- Phone (real Firebase SMS OTP) ----------
+    // ---------- Phone (real Firebase SMS OTP) ----------
   async sendPhoneOtp(phoneNumber: string) {
     if (typeof document === "undefined") {
       throw new Error("Phone verification requires a web browser.");
     }
-    if (recaptchaVerifier) {
-      try { recaptchaVerifier.clear(); } catch {}
-      recaptchaVerifier = null;
+
+    if (!recaptchaVerifier) {
+      recaptchaVerifier = new RecaptchaVerifier(
+        firebaseAuth,
+        "recaptcha-container",
+        {
+          size: "invisible",
+        }
+      );
+
+      await recaptchaVerifier.render();
     }
-    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", {
-      size: "invisible",
-    });
-    confirmationResult = await signInWithPhoneNumber(firebaseAuth, phoneNumber, recaptchaVerifier);
+
+    confirmationResult = await signInWithPhoneNumber(
+      firebaseAuth,
+      phoneNumber,
+      recaptchaVerifier
+    );
   },
 
   async confirmPhoneOtp(code: string, role: Role): Promise<User> {
