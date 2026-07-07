@@ -77,6 +77,11 @@ class FirebaseLoginIn(BaseModel):
     id_token: str
 
 
+class FirebasePhoneLoginIn(BaseModel):
+    id_token: str
+    role: Optional[Role] = "customer"
+
+
 class UserOut(BaseModel):
     id: str
     identifier: str
@@ -219,6 +224,36 @@ async def firebase_login(data: FirebaseLoginIn):
         await db.users.update_one({"id": user["id"]}, {"$set": {"role": role}})
         user["role"] = role
 
+    return user
+
+
+@api_router.post("/auth/firebase-phone-login")
+async def firebase_phone_login(data: FirebasePhoneLoginIn):
+    # Verified directly with Firebase — real SMS OTP was already confirmed client-side.
+    try:
+        decoded = fb_auth.verify_id_token(data.id_token)
+    except Exception:
+        raise HTTPException(401, "Invalid or expired login. Please try again.")
+
+    phone = decoded.get("phone_number")
+    if not phone:
+        raise HTTPException(400, "No phone number found in this login.")
+
+    # Phone accounts can never be admin, regardless of what's requested.
+    requested_role = data.role if data.role in ("seller", "customer") else "customer"
+
+    user = await db.users.find_one({"identifier": phone}, PROJ_NO_ID)
+    if not user:
+        user = {
+            "id": new_id(),
+            "identifier": phone,
+            "role": requested_role,
+            "verified": True,
+            "auth_provider": "firebase",
+            "created_at": now_iso(),
+        }
+        await db.users.insert_one(user)
+    # Existing users keep their stored role; role param only applies on first creation.
     return user
 
 

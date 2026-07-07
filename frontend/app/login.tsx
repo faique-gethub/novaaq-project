@@ -16,7 +16,6 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  // Forgot password modal state
   const [showReset, setShowReset] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetMsg, setResetMsg] = useState("");
@@ -24,17 +23,26 @@ export default function LoginScreen() {
 
   const submit = async () => {
     setErr("");
-    if (!identifier || !password) {
+    const trimmedId = identifier.trim();
+    const emailId = trimmedId.includes("@");
+    if (!trimmedId || (emailId && !password)) {
       setErr(t("err_fill_all"));
       return;
     }
     setBusy(true);
     try {
-      const user = await authService.login(identifier.trim(), password);
-      if (!user.verified) {
-        router.replace({ pathname: "/verify", params: { user_id: user.id } } as any);
-      } else {
+      if (emailId) {
+        const user = await authService.login(trimmedId, password);
         router.replace(("/(app)/" + user.role) as any);
+      } else {
+        const phoneOk = /^\+[1-9]\d{7,14}$/.test(trimmedId);
+        if (!phoneOk) {
+          setErr("Enter phone in international format, e.g. +923001234567");
+          setBusy(false);
+          return;
+        }
+        await authService.sendPhoneOtp(trimmedId);
+        router.replace({ pathname: "/verify", params: { phone: trimmedId, role: "customer" } } as any);
       }
     } catch (e: any) {
       setErr(e?.message || t("err_generic"));
@@ -143,6 +151,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </Modal>
+      <View nativeID="recaptcha-container" style={{ height: 0, width: 0, overflow: "hidden" }} />
     </SafeAreaView>
   );
 }

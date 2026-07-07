@@ -80,6 +80,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ id_token }),
     }),
+  firebasePhoneLogin: (id_token: string, role: Role) =>
+    request<User>("/auth/firebase-phone-login", {
+      method: "POST",
+      body: JSON.stringify({ id_token, role }),
+    }),
   getUser: (id: string) => request<User>(`/auth/user/${id}`),
 
   // categories

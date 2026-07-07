@@ -9,7 +9,7 @@ import { authService } from "@/src/services/auth";
 import { Role } from "@/src/services/api";
 import { colors, font, radius, spacing, tap } from "@/src/theme";
 
-const ROLES: Role[] = ["admin", "seller", "customer"];
+const ROLES: Role[] = ["seller", "customer"];
 
 export default function SignupScreen() {
   const { t } = useLang();
@@ -20,7 +20,6 @@ export default function SignupScreen() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  // Email verification waiting state
   const [waitingVerify, setWaitingVerify] = useState(false);
   const [resendMsg, setResendMsg] = useState("");
   const pollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,21 +47,27 @@ export default function SignupScreen() {
 
   const submit = async () => {
     setErr("");
-    if (!identifier || !password) {
+    const trimmedId = identifier.trim();
+    const emailId = trimmedId.includes("@");
+    if (!trimmedId || (emailId && !password)) {
       setErr(t("err_fill_all"));
       return;
     }
     setBusy(true);
     try {
-      const trimmedId = identifier.trim();
-      const res = await authService.signup(trimmedId, password, role);
-      if (trimmedId.includes("@")) {
-        // Email signup: verification email sent. Show waiting screen and poll.
+      if (emailId) {
+        await authService.signup(trimmedId, password, role);
         setWaitingVerify(true);
         startPolling();
       } else {
-        // Phone signup: keep the existing mock OTP verify flow.
-        router.replace({ pathname: "/verify", params: { user_id: (res as any).user_id } } as any);
+        const phoneOk = /^\+[1-9]\d{7,14}$/.test(trimmedId);
+        if (!phoneOk) {
+          setErr("Enter phone in international format, e.g. +923001234567");
+          setBusy(false);
+          return;
+        }
+        await authService.sendPhoneOtp(trimmedId);
+        router.replace({ pathname: "/verify", params: { phone: trimmedId, role } } as any);
       }
     } catch (e: any) {
       setErr(e?.message || t("err_generic"));
@@ -182,6 +187,7 @@ export default function SignupScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      <View nativeID="recaptcha-container" style={{ height: 0, width: 0, overflow: "hidden" }} />
     </SafeAreaView>
   );
 }

@@ -1,6 +1,6 @@
 // Auth service layer.
 // Email flow: real Firebase Authentication + real email verification, no OTP screen.
-// Phone flow: unchanged mock backend system.
+// Phone flow: real Firebase Phone Authentication (SMS OTP).
 import { storage } from "@/src/utils/storage";
 import { api, Role, User } from "./api";
 import { firebaseAuth } from "./firebaseConfig";
@@ -9,9 +9,15 @@ import {
   signInWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
 } from "firebase/auth";
 
 const USER_KEY = "novaaq_user";
+
+let recaptchaVerifier: RecaptchaVerifier | null = null;
+let confirmationResult: ConfirmationResult | null = null;
 
 function isEmail(identifier: string): boolean {
   return identifier.includes("@");
@@ -25,22 +31,17 @@ export const authService = {
       }
       const cred = await createUserWithEmailAndPassword(firebaseAuth, identifier, password);
       await sendEmailVerification(cred.user);
-      // Stay signed in (unverified) so we can poll and auto-login once verified.
       return { pendingVerification: true, message: "Verification email sent. Please check your inbox (and spam folder)." };
     }
-    // Phone flow — unchanged mock system
-    return api.signup(identifier, password, role);
+    throw new Error("Use sendPhoneOtp for phone signup.");
   },
 
-  // Call this repeatedly (e.g. every 3s) from a "waiting for verification" screen.
-  // Returns the logged-in User once verified, or null if still pending.
   async checkVerificationAndLogin(): Promise<User | null> {
     const current = firebaseAuth.currentUser;
     if (!current) return null;
     await current.reload();
     if (!current.emailVerified) return null;
-
-    const idToken = await current.getIdToken(true); // force refresh to get latest emailVerified claim
+    const idToken = await current.getIdToken(true);
     const user = await api.firebaseLogin(idToken);
     await storage.setItem(USER_KEY, JSON.stringify(user));
     return user;
@@ -52,10 +53,30 @@ export const authService = {
     await sendEmailVerification(current);
   },
 
-  async verify(user_id: string, code: string): Promise<User> {
-    // Only used by the phone mock flow. Email users verify via the link in their inbox.
-    const user = await api.verify(user_id, code);
+  // ---------- Phone (real Firebase SMS OTP) ----------
+  async sendPhoneOtp(phoneNumber: string) {
+    if (typeof document === "undefined") {
+      throw new Error("Phone verification requires a web browser.");
+    }
+    if (recaptchaVerifier) {
+      try { recaptchaVerifier.clear(); } catch {}
+      recaptchaVerifier = null;
+    }
+    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", {
+      size: "invisible",
+    });
+    confirmationResult = await signInWithPhoneNumber(firebaseAuth, phoneNumber, recaptchaVerifier);
+  },
+
+  async confirmPhoneOtp(code: string, role: Role): Promise<User> {
+    if (!confirmationResult) {
+      throw new Error("No OTP request found. Please request a new code.");
+    }
+    const cred = await confirmationResult.confirm(code);
+    const idToken = await cred.user.getIdToken(true);
+    const user = await api.firebasePhoneLogin(idToken, role);
     await storage.setItem(USER_KEY, JSON.stringify(user));
+    confirmationResult = null;
     return user;
   },
 
@@ -66,15 +87,12 @@ export const authService = {
       if (!cred.user.emailVerified) {
         throw new Error("Please verify your email before logging in. Check your inbox.");
       }
-      const idToken = await cred.user.getIdToken(true); // force refresh to get latest emailVerified claim
+      const idToken = await cred.user.getIdToken(true);
       const user = await api.firebaseLogin(idToken);
       await storage.setItem(USER_KEY, JSON.stringify(user));
       return user;
     }
-    // Phone flow — unchanged mock system
-    const user = await api.login(identifier, password);
-    await storage.setItem(USER_KEY, JSON.stringify(user));
-    return user;
+    throw new Error("Use sendPhoneOtp for phone login.");
   },
 
   async requestPasswordReset(email: string) {
