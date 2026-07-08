@@ -32,14 +32,12 @@ export default function CustomerHome() {
     <SafeAreaView style={styles.root} edges={["top", "bottom"]} testID="customer-screen">
       <View style={styles.header}>
         <Text style={styles.title}>{t("browse")}</Text>
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+        <View style={styles.actionsRow}>
           <TouchableOpacity onPress={() => setUploadOpen(true)} style={styles.iconBtn} testID="open-upload-button">
             <Ionicons name="add-circle" size={20} color={colors.white} />
-            <Text style={styles.iconBtnTxt}>{t("upload_post") || "Add"}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setStatsOpen(true)} style={[styles.iconBtn, { backgroundColor: colors.secondary }]} testID="open-ad-stats-button">
             <Ionicons name="stats-chart" size={20} color={colors.white} />
-            <Text style={styles.iconBtnTxt}>{t("my_ad_stats") || "Analytics"}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={logout} style={styles.iconBtn} testID="logout-button">
             <Ionicons name="log-out-outline" size={20} color={colors.white} />
@@ -65,14 +63,14 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.white },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  title: { fontSize: font.h2, fontWeight: "800", color: colors.text },
+  title: { fontSize: font.h2, fontWeight: "800", color: colors.text, flexShrink: 1 },
+  actionsRow: { flexDirection: "row", gap: spacing.sm, flexShrink: 0 },
   iconBtn: {
-    minHeight: tap.min - 12, paddingHorizontal: spacing.md,
+    minWidth: tap.min - 8, minHeight: tap.min - 8, paddingHorizontal: spacing.sm,
     backgroundColor: colors.primary, borderRadius: radius.button,
-    flexDirection: "row", alignItems: "center", gap: spacing.sm,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
   },
-  iconBtnTxt: { color: colors.white, fontWeight: "700", fontSize: font.caption },
 });

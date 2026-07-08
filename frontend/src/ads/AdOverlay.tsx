@@ -7,8 +7,6 @@ import { useLang } from "@/src/i18n/context";
 import { Ad } from "@/src/services/api";
 import { useAds } from "./context";
 
-// Shows a full-screen interstitial ad. Auto-dismisses after `duration` seconds
-// (max 15). User may also press Skip.
 export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad, onClose }) => {
   const { t } = useLang();
   const { markShown } = useAds();
@@ -46,14 +44,14 @@ export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad
     <Modal visible={!!ad} transparent={false} animationType="fade">
       <View style={styles.root} testID="ad-overlay">
         <View style={styles.topBar}>
-          <Text style={styles.label} testID="ad-label">{t("advertisement")}</Text>
+          <Text style={styles.label} testID="ad-label" numberOfLines={1}>{t("advertisement")}</Text>
           <TouchableOpacity
             style={styles.skipBtn}
             onPress={onClose}
             testID="ad-skip-button"
             accessibilityRole="button"
           >
-            <Text style={styles.skipTxt}>{t("skip")} ({remaining}{t("seconds")})</Text>
+            <Text style={styles.skipTxt} numberOfLines={1}>{t("skip")} ({remaining}{t("seconds")})</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.media}>
@@ -77,35 +75,38 @@ export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.black, padding: spacing.md, justifyContent: "center" },
+  root: { flex: 1, backgroundColor: colors.black, padding: spacing.md, justifyContent: "center", overflow: "hidden" },
   topBar: {
     position: "absolute",
     top: spacing.xl,
-    left: spacing.md,
-    right: spacing.md,
+    left: spacing.sm,
+    right: spacing.sm,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     zIndex: 10,
+    gap: spacing.sm,
   },
   label: {
     color: colors.white,
     fontSize: font.caption,
     fontWeight: "700",
     backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     borderRadius: radius.button,
+    flexShrink: 1,
   },
   skipBtn: {
-    minHeight: tap.min,
-    paddingHorizontal: spacing.md,
+    minHeight: tap.min - 8,
+    paddingHorizontal: spacing.sm,
     justifyContent: "center",
     backgroundColor: colors.white,
     borderRadius: radius.button,
+    flexShrink: 0,
   },
   skipTxt: { color: colors.text, fontWeight: "700", fontSize: font.caption },
-  media: { flex: 1, alignItems: "center", justifyContent: "center" },
+  media: { flex: 1, alignItems: "center", justifyContent: "center", width: "100%" },
   mediaEl: { width: "100%", height: "80%" },
   title: {
     color: colors.white,
