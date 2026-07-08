@@ -75,10 +75,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ identifier, password }),
     }),
-  firebaseLogin: (id_token: string) =>
+  firebaseLogin: (id_token: string, role?: Role) =>
     request<User>("/auth/firebase-login", {
       method: "POST",
-      body: JSON.stringify({ id_token }),
+      body: JSON.stringify({ id_token, role }),
     }),
   firebasePhoneLogin: (id_token: string, role: Role) =>
     request<User>("/auth/firebase-phone-login", {

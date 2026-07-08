@@ -6,7 +6,11 @@ import { TriangleLogo } from "@/src/components/TriangleLogo";
 import { BigButton } from "@/src/components/ui";
 import { useLang } from "@/src/i18n/context";
 import { authService } from "@/src/services/auth";
+import { api } from "@/src/services/api";
+import { storage } from "@/src/utils/storage";
 import { colors, font, spacing } from "@/src/theme";
+
+const USER_KEY = "novaaq_user";
 
 export default function LanguageScreen() {
   const { setLang } = useLang();
@@ -14,9 +18,18 @@ export default function LanguageScreen() {
 
   const choose = async (l: "en" | "ur") => {
     await setLang(l);
-    const user = await authService.currentUser();
-    if (user && user.verified) {
-      router.replace(("/(app)/" + user.role) as any);
+    const cached = await authService.currentUser();
+    if (cached && cached.verified) {
+      // Refresh from backend so role changes (e.g. admin promoting a seller)
+      // take effect immediately, instead of trusting a possibly-stale local cache.
+      try {
+        const fresh = await api.getUser(cached.id);
+        await storage.setItem(USER_KEY, JSON.stringify(fresh));
+        router.replace(("/(app)/" + fresh.role) as any);
+      } catch {
+        // Backend unreachable or user deleted — fall back to cached role.
+        router.replace(("/(app)/" + cached.role) as any);
+      }
     } else {
       router.replace("/login" as any);
     }
@@ -28,7 +41,6 @@ export default function LanguageScreen() {
         <TriangleLogo size={160} />
         <Text style={styles.brand} testID="app-name">Novaaq</Text>
       </View>
-
       <View style={styles.body}>
         <Text style={styles.title} testID="choose-language-title">Choose Language</Text>
         <Text style={styles.subtitle}>زبان منتخب کریں</Text>

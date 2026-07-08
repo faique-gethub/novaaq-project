@@ -1,6 +1,3 @@
-// Auth service layer.
-// Email flow: real Firebase Authentication + real email verification, no OTP screen.
-// Phone flow: real Firebase Phone Authentication (SMS OTP).
 import { storage } from "@/src/utils/storage";
 import { api, Role, User } from "./api";
 import { firebaseAuth } from "./firebaseConfig";
@@ -15,6 +12,7 @@ import {
 } from "firebase/auth";
 
 const USER_KEY = "novaaq_user";
+const PENDING_ROLE_KEY = "novaaq_pending_signup_role";
 
 let recaptchaVerifier: RecaptchaVerifier | null = null;
 let confirmationResult: ConfirmationResult | null = null;
@@ -31,6 +29,7 @@ export const authService = {
       }
       const cred = await createUserWithEmailAndPassword(firebaseAuth, identifier, password);
       await sendEmailVerification(cred.user);
+      await storage.setItem(PENDING_ROLE_KEY, role);
       return { pendingVerification: true, message: "Verification email sent. Please check your inbox (and spam folder)." };
     }
     throw new Error("Use sendPhoneOtp for phone signup.");
@@ -42,7 +41,9 @@ export const authService = {
     await current.reload();
     if (!current.emailVerified) return null;
     const idToken = await current.getIdToken(true);
-    const user = await api.firebaseLogin(idToken);
+    const pendingRole = await storage.getItem<string>(PENDING_ROLE_KEY, "");
+    const user = await api.firebaseLogin(idToken, (pendingRole as Role) || undefined);
+    await storage.removeItem(PENDING_ROLE_KEY);
     await storage.setItem(USER_KEY, JSON.stringify(user));
     return user;
   },
@@ -53,29 +54,18 @@ export const authService = {
     await sendEmailVerification(current);
   },
 
-    // ---------- Phone (real Firebase SMS OTP) ----------
   async sendPhoneOtp(phoneNumber: string) {
     if (typeof document === "undefined") {
       throw new Error("Phone verification requires a web browser.");
     }
-
-    if (!recaptchaVerifier) {
-      recaptchaVerifier = new RecaptchaVerifier(
-        firebaseAuth,
-        "recaptcha-container",
-        {
-          size: "invisible",
-        }
-      );
-
-      await recaptchaVerifier.render();
+    if (recaptchaVerifier) {
+      try { recaptchaVerifier.clear(); } catch {}
+      recaptchaVerifier = null;
     }
-
-    confirmationResult = await signInWithPhoneNumber(
-      firebaseAuth,
-      phoneNumber,
-      recaptchaVerifier
-    );
+    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, "recaptcha-container", {
+      size: "invisible",
+    });
+    confirmationResult = await signInWithPhoneNumber(firebaseAuth, phoneNumber, recaptchaVerifier);
   },
 
   async confirmPhoneOtp(code: string, role: Role): Promise<User> {

@@ -5,17 +5,22 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { PostFeed } from "@/src/components/PostFeed";
 import { authService } from "@/src/services/auth";
-import { User } from "@/src/services/api";
+import { api, Category, User } from "@/src/services/api";
 import { useLang } from "@/src/i18n/context";
 import { colors, font, radius, spacing, tap } from "@/src/theme";
+import { UploadModal, AdStatsModal } from "@/src/components/SellerModals";
 
 export default function CustomerHome() {
   const { t } = useLang();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [cats, setCats] = useState<Category[]>([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     authService.currentUser().then(setUser);
+    api.listCategories().then(setCats);
   }, []);
 
   const logout = async () => {
@@ -27,12 +32,31 @@ export default function CustomerHome() {
     <SafeAreaView style={styles.root} edges={["top", "bottom"]} testID="customer-screen">
       <View style={styles.header}>
         <Text style={styles.title}>{t("browse")}</Text>
-        <TouchableOpacity onPress={logout} style={styles.iconBtn} testID="logout-button">
-          <Ionicons name="log-out-outline" size={24} color={colors.white} />
-          <Text style={styles.iconBtnTxt}>{t("logout")}</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <TouchableOpacity onPress={() => setUploadOpen(true)} style={styles.iconBtn} testID="open-upload-button">
+            <Ionicons name="add-circle" size={20} color={colors.white} />
+            <Text style={styles.iconBtnTxt}>{t("upload_post") || "Add"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setStatsOpen(true)} style={[styles.iconBtn, { backgroundColor: colors.secondary }]} testID="open-ad-stats-button">
+            <Ionicons name="stats-chart" size={20} color={colors.white} />
+            <Text style={styles.iconBtnTxt}>{t("my_ad_stats") || "Analytics"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={logout} style={styles.iconBtn} testID="logout-button">
+            <Ionicons name="log-out-outline" size={20} color={colors.white} />
+          </TouchableOpacity>
+        </View>
       </View>
+
       <PostFeed user={user} />
+
+      <UploadModal
+        visible={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        cats={cats}
+        user={user}
+        onDone={() => setUploadOpen(false)}
+      />
+      <AdStatsModal visible={statsOpen} onClose={() => setStatsOpen(false)} user={user} />
     </SafeAreaView>
   );
 }
