@@ -75,6 +75,7 @@ class VerifyIn(BaseModel):
 
 class FirebaseLoginIn(BaseModel):
     id_token: str
+    role: Optional[Role] = None
 
 
 class FirebasePhoneLoginIn(BaseModel):
@@ -206,10 +207,14 @@ async def firebase_login(data: FirebaseLoginIn):
         raise HTTPException(403, "Please verify your email before logging in. Check your inbox.")
 
     email = decoded["email"]
-    role = "admin" if email in ADMIN_EMAILS else "customer"
+    is_admin_email = email in ADMIN_EMAILS
+    requested_role = data.role if data.role in ("seller", "customer") else "customer"
 
     user = await db.users.find_one({"identifier": email}, PROJ_NO_ID)
     if not user:
+        # New user: admin emails always become admin; otherwise use the role
+        # they actually picked at signup (seller/customer).
+        role = "admin" if is_admin_email else requested_role
         user = {
             "id": new_id(),
             "identifier": email,
@@ -219,10 +224,11 @@ async def firebase_login(data: FirebaseLoginIn):
             "created_at": now_iso(),
         }
         await db.users.insert_one(user)
-    elif user.get("role") != role:
-        # Keeps role in sync with ADMIN_EMAILS on every login (handles promote + demote).
-        await db.users.update_one({"id": user["id"]}, {"$set": {"role": role}})
-        user["role"] = role
+    elif is_admin_email and user.get("role") != "admin":
+        # Existing user whose email is in ADMIN_EMAILS: keep promoting to admin.
+        await db.users.update_one({"id": user["id"]}, {"$set": {"role": "admin"}})
+        user["role"] = "admin"
+    # Existing non-admin users keep whatever role they already have in the DB.
 
     return user
 
@@ -525,8 +531,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8081",
         "http://127.0.0.1:8081",
-        "https://novaaq-frontend.onrender.com",
+        "https://novaaq-project.onrender.com",
     ],
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_methods=["*"],
     allow_headers=["*"],
 )
