@@ -56,6 +56,7 @@ export type Ad = {
   active: boolean;
   views: number;
   created_at: string;
+  skip_after_seconds: number;
 };
 
 export const api = {
@@ -137,6 +138,7 @@ export const api = {
     media_url: string;
     duration_seconds?: number;
     title?: string;
+    skip_after_seconds?: number;
   }) => request<Ad>("/ads", { method: "POST", body: JSON.stringify(data) }),
   toggleAd: (id: string) =>
     request<{ ok: boolean; active: boolean }>(`/ads/${id}/toggle`, { method: "PUT" }),

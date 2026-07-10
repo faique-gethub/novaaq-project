@@ -9,6 +9,7 @@ import { api, Category, User } from "@/src/services/api";
 import { useLang } from "@/src/i18n/context";
 import { colors, font, radius, spacing, tap } from "@/src/theme";
 import { UploadModal, AdStatsModal } from "@/src/components/SellerModals";
+import { NotificationBell } from "@/src/components/NotificationBell";
 
 export default function CustomerHome() {
   const { t } = useLang();
@@ -33,6 +34,7 @@ export default function CustomerHome() {
       <View style={styles.header}>
         <Text style={styles.title}>{t("browse")}</Text>
         <View style={styles.actionsRow}>
+          <NotificationBell user={user} />
           <TouchableOpacity onPress={() => setUploadOpen(true)} style={styles.iconBtn} testID="open-upload-button">
             <Ionicons name="add-circle" size={20} color={colors.white} />
           </TouchableOpacity>

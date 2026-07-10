@@ -41,6 +41,7 @@ export default function SellerHome() {
       <View style={styles.header}>
         <Text style={styles.title}>{t("seller_home")}</Text>
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <NotificationBell user={user} />
           <TouchableOpacity onPress={toggleLang} style={styles.pillBtn} testID="seller-lang-toggle">
             <Ionicons name="language" size={20} color={colors.white} />
             <Text style={styles.pillTxt}>{lang === "en" ? "اردو" : "EN"}</Text>

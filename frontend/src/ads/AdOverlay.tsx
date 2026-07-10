@@ -11,7 +11,9 @@ export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad
   const { t } = useLang();
   const { markShown } = useAds();
   const [remaining, setRemaining] = useState(0);
-  const timerRef = useRef<any>(null);
+  const [canSkip, setCanSkip] = useState(false);
+  const skipTimerRef = useRef<any>(null);
+  const videoWatchRef = useRef<any>(null);
 
   const player = useVideoPlayer(ad?.media_type === "video" ? ad.media_url : null, (p) => {
     p.loop = false;
@@ -22,19 +24,44 @@ export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad
   useEffect(() => {
     if (!ad) return;
     markShown(ad.id);
-    const dur = Math.min(15, Math.max(3, Math.round(ad.duration_seconds || (ad.media_type === "video" ? 10 : 5))));
-    setRemaining(dur);
-    timerRef.current = setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          clearInterval(timerRef.current);
-          onClose();
-          return 0;
+
+    const skipAfter = Math.max(0, ad.skip_after_seconds ?? 5);
+    setRemaining(Math.ceil(skipAfter));
+    setCanSkip(skipAfter <= 0);
+
+    if (skipAfter > 0) {
+      skipTimerRef.current = setInterval(() => {
+        setRemaining((r) => {
+          if (r <= 1) {
+            clearInterval(skipTimerRef.current);
+            setCanSkip(true);
+            return 0;
+          }
+          return r - 1;
+        });
+      }, 1000);
+    }
+
+    // For video ads, close automatically once playback finishes.
+    if (ad.media_type === "video") {
+      videoWatchRef.current = setInterval(() => {
+        try {
+          const dur = player.duration;
+          const cur = player.currentTime;
+          if (dur && cur && cur >= dur - 0.3) {
+            clearInterval(videoWatchRef.current);
+            onClose();
+          }
+        } catch {
+          // player not ready yet; ignore
         }
-        return r - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
+      }, 500);
+    }
+
+    return () => {
+      clearInterval(skipTimerRef.current);
+      clearInterval(videoWatchRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ad?.id]);
 
@@ -46,12 +73,15 @@ export const AdOverlay: React.FC<{ ad: Ad | null; onClose: () => void }> = ({ ad
         <View style={styles.topBar}>
           <Text style={styles.label} testID="ad-label" numberOfLines={1}>{t("advertisement")}</Text>
           <TouchableOpacity
-            style={styles.skipBtn}
-            onPress={onClose}
+            style={[styles.skipBtn, !canSkip && styles.skipBtnDisabled]}
+            onPress={canSkip ? onClose : undefined}
+            disabled={!canSkip}
             testID="ad-skip-button"
             accessibilityRole="button"
           >
-            <Text style={styles.skipTxt} numberOfLines={1}>{t("skip")} ({remaining}{t("seconds")})</Text>
+            <Text style={[styles.skipTxt, !canSkip && styles.skipTxtDisabled]} numberOfLines={1}>
+              {canSkip ? t("skip") : `${t("skip")} ${remaining}${t("seconds")}`}
+            </Text>
           </TouchableOpacity>
         </View>
         <View style={styles.media}>
@@ -105,7 +135,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     flexShrink: 0,
   },
+  skipBtnDisabled: {
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
   skipTxt: { color: colors.text, fontWeight: "700", fontSize: font.caption },
+  skipTxtDisabled: { color: colors.text_secondary },
   media: { flex: 1, alignItems: "center", justifyContent: "center", width: "100%" },
   mediaEl: { width: "100%", height: "80%" },
   title: {

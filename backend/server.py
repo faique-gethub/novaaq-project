@@ -145,6 +145,7 @@ class AdIn(BaseModel):
     media_url: str
     duration_seconds: Optional[float] = 0
     title: Optional[str] = ""
+    skip_after_seconds: Optional[float] = 5
 
 
 class AdOut(BaseModel):
@@ -158,6 +159,7 @@ class AdOut(BaseModel):
     active: bool
     views: int
     created_at: str
+    skip_after_seconds: float = 5
 
 
 class AdConfigIn(BaseModel):
@@ -456,11 +458,13 @@ async def list_ads(active_only: bool = False, uploader_id: Optional[str] = None)
 
 @api_router.post("/ads", response_model=AdOut)
 async def create_ad(data: AdIn):
-    if data.media_type == "video" and data.duration_seconds and data.duration_seconds > 15:
-        raise HTTPException(400, "Ad video max 15 seconds")
+    if data.media_type == "video" and data.duration_seconds and data.duration_seconds > 120:
+        raise HTTPException(400, "Ad video max 120 seconds")
+    skip_after = max(0, min(data.skip_after_seconds or 5, data.duration_seconds or 15))
     ad = {
         "id": new_id(),
         **data.model_dump(),
+        "skip_after_seconds": skip_after,
         "active": True,
         "views": 0,
         "created_at": now_iso(),
@@ -482,8 +486,10 @@ async def toggle_ad(ad_id: str):
 
 @api_router.delete("/ads/{ad_id}")
 async def delete_ad(ad_id: str):
-    await db.ads.delete_one({"id": ad_id})
-    return {"ok": True}
+    result = await db.ads.delete_one({"id": ad_id})
+    if result.deleted_count == 0:
+        raise HTTPException(404, "Ad not found (already deleted?)")
+    return {"ok": True, "deleted_count": result.deleted_count}
 
 
 @api_router.post("/ads/{ad_id}/view")
@@ -508,6 +514,50 @@ async def set_ad_config(data: AdConfigIn):
         {"id": "singleton"}, {"$set": {"screens_per_ad": max(1, data.screens_per_ad)}}, upsert=True
     )
     return {"screens_per_ad": data.screens_per_ad}
+
+
+# ---------- Notifications ----------
+class NotificationIn(BaseModel):
+    message: str
+    target: Optional[str] = None  # None or "all" = everyone; else a specific identifier (email/phone)
+
+class NotificationOut(BaseModel):
+    id: str
+    message: str
+    target: Optional[str] = None
+    created_at: str
+    read_by: List[str] = []
+
+@api_router.post("/notifications", response_model=NotificationOut)
+async def create_notification(data: NotificationIn):
+    if not data.message.strip():
+        raise HTTPException(400, "Message cannot be empty")
+    n = {
+        "id": new_id(),
+        "message": data.message.strip(),
+        "target": data.target if data.target and data.target != "all" else None,
+        "created_at": now_iso(),
+        "read_by": [],
+    }
+    await db.notifications.insert_one(n)
+    n.pop("_id", None)
+    return n
+
+@api_router.get("/notifications", response_model=List[NotificationOut])
+async def list_notifications(identifier: str):
+    docs = await db.notifications.find(
+        {"$or": [{"target": None}, {"target": identifier}]}, PROJ_NO_ID
+    ).to_list(500)
+    docs.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return docs
+
+@api_router.post("/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, data: LikeIn):
+    # Reuses LikeIn shape ({"user_id": ...}) since it's the same {id} pattern.
+    await db.notifications.update_one(
+        {"id": notif_id}, {"$addToSet": {"read_by": data.user_id}}
+    )
+    return {"ok": True}
 
 
 @api_router.get("/")
