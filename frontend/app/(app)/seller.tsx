@@ -7,7 +7,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { PostFeed } from "@/src/components/PostFeed";
+import { NotificationBell } from "@/src/components/NotificationBell";
 import { authService } from "@/src/services/auth";
+import { api as apiModule } from "@/src/services/api";
 import { api, Category, User } from "@/src/services/api";
 import { uploadMedia } from "@/src/services/upload";
 import { useLang } from "@/src/i18n/context";
@@ -21,6 +23,31 @@ export default function SellerHome() {
   const [cats, setCats] = useState<Category[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminId, setAdminId] = useState("");
+  const [adminPw, setAdminPw] = useState("");
+  const [adminErr, setAdminErr] = useState("");
+  const [adminBusy, setAdminBusy] = useState(false);
+
+  const submitAdmin = async () => {
+    setAdminErr("");
+    setAdminBusy(true);
+    try {
+      const adminUser = await apiModule.login(adminId.trim(), adminPw);
+      if (adminUser.role !== "admin") {
+        setAdminErr("Not an admin account");
+        setAdminBusy(false);
+        return;
+      }
+      await authService.login(adminId.trim(), adminPw);
+      setAdminOpen(false);
+      router.replace("/(app)/admin" as any);
+    } catch (e: any) {
+      setAdminErr(e?.message || "Login failed");
+    } finally {
+      setAdminBusy(false);
+    }
+  };
 
   useEffect(() => {
     authService.currentUser().then(setUser);
@@ -46,8 +73,8 @@ export default function SellerHome() {
             <Ionicons name="language" size={20} color={colors.white} />
             <Text style={styles.pillTxt}>{lang === "en" ? "اردو" : "EN"}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={styles.pillBtn} testID="logout-button">
-            <Ionicons name="log-out-outline" size={20} color={colors.white} />
+          <TouchableOpacity onPress={() => setAdminOpen(true)} style={[styles.pillBtn, { backgroundColor: colors.text }]} testID="open-admin-login-button">
+            <Ionicons name="shield-checkmark" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -73,6 +100,37 @@ export default function SellerHome() {
         onDone={() => setUploadOpen(false)}
       />
       <AdStatsModal visible={statsOpen} onClose={() => setStatsOpen(false)} user={user} />
+
+      <Modal visible={adminOpen} animationType="slide" transparent onRequestClose={() => setAdminOpen(false)}>
+        <View style={styles.adminOverlay}>
+          <View style={styles.adminBox} testID="admin-login-modal">
+            <Text style={styles.adminTitle}>Admin Login</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Admin email or phone"
+              placeholderTextColor={colors.text_secondary}
+              value={adminId}
+              onChangeText={setAdminId}
+              autoCapitalize="none"
+              testID="admin-login-id"
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={colors.text_secondary}
+              value={adminPw}
+              onChangeText={setAdminPw}
+              secureTextEntry
+              testID="admin-login-password"
+            />
+            {!!adminErr && <Text style={styles.err}>{adminErr}</Text>}
+            <BigButton label={adminBusy ? "..." : "Login"} onPress={submitAdmin} disabled={adminBusy} testID="admin-login-submit" />
+            <TouchableOpacity onPress={() => setAdminOpen(false)} style={{ marginTop: spacing.md, alignItems: "center" }} testID="admin-login-cancel">
+              <Text style={{ color: colors.text_secondary, fontWeight: "700" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -290,6 +348,15 @@ const AdStatsModal: React.FC<{ visible: boolean; onClose: () => void; user: User
 };
 
 const styles = StyleSheet.create({
+  adminOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  adminBox: { backgroundColor: colors.white, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card, padding: spacing.lg },
+  adminTitle: { fontSize: font.h2, fontWeight: "800", color: colors.text, marginBottom: spacing.md },
+  input: {
+    borderWidth: 2, borderColor: colors.border, borderRadius: radius.button,
+    paddingHorizontal: spacing.md, minHeight: tap.min, fontSize: font.body,
+    color: colors.text, marginBottom: spacing.md,
+  },
+  err: { color: colors.error, fontSize: font.caption, marginBottom: spacing.md },
   root: { flex: 1, backgroundColor: colors.white },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

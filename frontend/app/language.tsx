@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { TriangleLogo } from "@/src/components/TriangleLogo";
 import { BigButton } from "@/src/components/ui";
 import { useLang } from "@/src/i18n/context";
-import { authService } from "@/src/services/auth";
+import { authService, getOrCreateGuestUser } from "@/src/services/auth";
 import { api } from "@/src/services/api";
 import { storage } from "@/src/utils/storage";
 import { colors, font, spacing } from "@/src/theme";
@@ -31,7 +31,12 @@ export default function LanguageScreen() {
         router.replace(("/(app)/" + cached.role) as any);
       }
     } else {
-      router.replace("/login" as any);
+      try {
+        const guest = await getOrCreateGuestUser();
+        router.replace(("/(app)/" + guest.role) as any);
+      } catch {
+        router.replace("/login" as any);
+      }
     }
   };
 

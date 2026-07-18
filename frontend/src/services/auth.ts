@@ -21,6 +21,38 @@ function isEmail(identifier: string): boolean {
   return identifier.includes("@");
 }
 
+const GUEST_KEY = "novaaq_guest_identifier";
+
+function randomId(): string {
+  return "guest_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+export async function getOrCreateGuestUser(): Promise<User> {
+  const cachedRaw = await storage.getItem<string>(USER_KEY, "");
+  if (cachedRaw) {
+    try {
+      const cached = JSON.parse(cachedRaw) as User;
+      if (cached.role !== "admin") return cached;
+    } catch {}
+  }
+  let guestId = await storage.getItem<string>(GUEST_KEY, "");
+  if (!guestId) {
+    guestId = randomId();
+    await storage.setItem(GUEST_KEY, guestId);
+  }
+  const guestPassword = "guest_no_password";
+  try {
+    const res = await api.signup(guestId, guestPassword, "seller");
+    const user = await api.getUser(res.user_id);
+    await storage.setItem(USER_KEY, JSON.stringify(user));
+    return user;
+  } catch {
+    const user = await api.login(guestId, guestPassword);
+    await storage.setItem(USER_KEY, JSON.stringify(user));
+    return user;
+  }
+}
+
 export const authService = {
   async signup(identifier: string, password: string, role: Role) {
     if (isEmail(identifier)) {

@@ -191,9 +191,7 @@ export const PostFeed: React.FC<Props> = ({ user, onAdminAction }) => {
               </View>
               <View style={styles.modalFooter}>
                 <Text style={styles.modalDesc}>{expandedPost.description}</Text>
-                <Text style={styles.sellerTxt}>
-                  @{expandedPost.seller_identifier || expandedPost.seller_id.slice(0, 6)}
-                </Text>
+
                 <TouchableOpacity
                   style={styles.likeBtn}
                   onPress={() => toggleLike(expandedPost)}
@@ -295,7 +293,7 @@ const PostCard: React.FC<{
       </View>
       <View style={styles.cardFooter}>
         <Text style={styles.desc} numberOfLines={2}>{post.description}</Text>
-        <Text style={styles.sellerTxt} testID={`post-seller-${post.id}`}>@{post.seller_identifier || post.seller_id.slice(0, 6)}</Text>
+
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={styles.likeBtn}
